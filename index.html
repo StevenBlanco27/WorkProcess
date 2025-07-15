@@ -11,9 +11,8 @@
     .suggestions div { padding: 8px; cursor: pointer; }
     .suggestions div:hover { background: #f0f0f0; }
     .position-relative { position: relative; }
-    #alertaModificacion { display: none; }
-    #spinner { display: none; }
-    #resultadoConsulta { display: none; max-height: 300px; overflow-y: auto; }
+    #alertaModificacion, #spinner, #resultadoConsulta, #detalleResultados { display: none; }
+    #resultadoConsulta, #detalleResultados { max-height: 300px; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -33,17 +32,14 @@
     <button id="copiar" class="btn btn-secondary flex-fill">📋 Copiar</button>
     <button id="limpiar" class="btn btn-outline-secondary flex-fill">🧹 Limpiar</button>
     <button id="recargar" class="btn btn-outline-primary flex-fill" hidden>🔄 Recargar</button>
-    <button id="btnConsultar" class="btn btn-info flex-fill">🔍 Mis trabajos</button>
   </div>
 
   <form id="formulario" autocomplete="off">
     <input type="hidden" name="Address" id="direccionSeleccionada" />
     <label for="nombre">Nombre:</label>
     <input type="text" class="form-control" id="nombre" name="Name" required>
-
     <label for="fecha">Fecha:</label>
     <input type="date" class="form-control" id="fecha" name="Date" required>
-
     <button type="submit" class="btn btn-success w-100 mt-3" id="btnActualizar">✅ Actualizar</button>
   </form>
 
@@ -54,8 +50,23 @@
     <div>Cargando...</div>
   </div>
 
-  <div id="resultadoConsulta" class="border rounded p-2 bg-light mt-3">
-    <ul class="list-group" id="listaResultados"></ul>
+  <hr>
+  <h5>🔎 Consultar trabajos hechos</h5>
+  <div class="input-group mb-2">
+    <button class="btn btn-info w-100" id="btnConsultar">🔍 Buscar por fecha</button>
+  </div>
+
+  <div id="resultadoConsulta" class="border rounded p-2 bg-light">
+    <div class="fw-bold mb-2">Trabajos realizados: <span id="contadorTrabajos"></span></div>
+    <button class="btn btn-outline-secondary btn-sm w-100" onclick="mostrarDetalle()">Ver detalle completo</button>
+  </div>
+
+  <div id="detalleResultados" class="border rounded p-2 mt-3 bg-white">
+    <h6>📄 Detalle completo</h6>
+    <table class="table table-bordered table-sm">
+      <thead><tr><th>Nombre</th><th>Dirección</th><th>Fecha</th></tr></thead>
+      <tbody id="tablaDetalle"></tbody>
+    </table>
   </div>
 
   <script>
@@ -73,11 +84,8 @@
     const nombreAlerta = document.getElementById("nombreAlerta");
     const btnActualizar = document.getElementById("btnActualizar");
     const spinner = document.getElementById("spinner");
-    const resultadoConsulta = document.getElementById("resultadoConsulta");
-    const listaResultados = document.getElementById("listaResultados");
 
-    let direcciones = [];
-    let registros = [];
+    let direcciones = [], registros = [];
 
     async function cargarHoja() {
       try {
@@ -103,6 +111,7 @@
       sugerencias.innerHTML = "";
       resetForm();
       if (!q) return sugerencias.style.display = "none";
+
       const filtradas = direcciones.filter(d => d.toLowerCase().includes(q));
       filtradas.forEach(d => {
         const div = document.createElement("div");
@@ -119,9 +128,11 @@
       sugerencias.style.display = "none";
       const reg = registros.find(r => r["Address"] === dir);
       const hoy = new Date().toISOString().split("T")[0];
+
       if (reg) {
         nombreInput.value = reg["Name"] || localStorage.getItem("miNombreGuardado") || "";
         fechaInput.value = reg["Date"] && !isNaN(new Date(reg["Date"])) ? new Date(reg["Date"]).toISOString().split("T")[0] : hoy;
+
         if (reg["Name"] && reg["Date"]) {
           alerta.style.display = "block";
           nombreAlerta.textContent = reg["Name"];
@@ -153,9 +164,7 @@
 
     nombreInput.addEventListener("input", () => {
       let valor = nombreInput.value.trimStart();
-      if (valor.length > 0) {
-        valor = valor.charAt(0).toUpperCase() + valor.slice(1);
-      }
+      if (valor.length > 0) valor = valor.charAt(0).toUpperCase() + valor.slice(1);
       nombreInput.value = valor.replace(/\s+$/, "");
     });
 
@@ -170,23 +179,27 @@
       const nombre = nombreInput.value.trim();
       const fecha = fechaInput.value;
       if (!dir || !nombre || !fecha) return alert("⚠️ Debes completar todos los campos.");
+
       try {
         spinner.style.display = "block";
         const resVerif = await fetch(JSON_URL);
         registros = await resVerif.json();
+
         const yaExiste = registros.find(r => r["Address"] === dir && r["Name"] && r["Date"]);
         if (yaExiste) {
           spinner.style.display = "none";
           return alert("❌ Esta dirección ya fue registrada por " + yaExiste["Name"]);
         }
+
         const datos = new FormData();
         datos.append("Address", dir);
         datos.append("Name", nombre);
         datos.append("Date", fecha);
+
         const res = await fetch(POST_URL, { method: "POST", body: datos });
         if (!res.ok) throw new Error("Error al guardar");
+
         alert("✅ Información guardada correctamente");
-        await new Promise(resolve => setTimeout(resolve, 1000));
         await cargarHoja();
         document.getElementById("limpiar").click();
       } catch (err) {
@@ -195,18 +208,37 @@
         spinner.style.display = "none";
       }
     });
+    function parsearFechaManual(fechaTexto) {
+      if (!fechaTexto) return null;
+
+      const meses = {
+        "ene": "01", "feb": "02", "mar": "03", "abr": "04",
+        "may": "05", "jun": "06", "jul": "07", "ago": "08",
+        "sep": "09", "oct": "10", "nov": "11", "dic": "12"
+      };
+
+      const partes = fechaTexto.trim().toLowerCase().split(" ");
+      if (partes.length < 2) return null;
+
+      const dia = partes[0].padStart(2, "0");
+      const mes = meses[partes[1].substring(0, 3)];
+      const año = new Date().getFullYear();
+
+      if (!mes) return null;
+      return `${año}-${mes}-${dia}`; // ej: 2025-07-15
+    }
 
     document.getElementById("btnConsultar").addEventListener("click", async () => {
-      const nombre = document.getElementById("nombre").value.trim().toLowerCase(); // usa el nombre ya ingresado
-      const lista = document.getElementById("listaResultados");
+      const nombre = nombreInput.value.trim().toLowerCase();
+      const fechaSeleccionada = fechaInput.value.trim(); // usa el input de fecha
+      if (!fechaSeleccionada) return alert("Selecciona una fecha válida");
+
+
       const contenedor = document.getElementById("resultadoConsulta");
+      const tabla = document.getElementById("tablaDetalle");
+      const contador = document.getElementById("contadorTrabajos");
+      tabla.innerHTML = "";
 
-      if (!nombre) return alert("Escribe tu nombre arriba para buscar");
-
-      lista.innerHTML = "";
-      contenedor.style.display = "none";
-
-      // 🔄 Refrescar datos antes de buscar
       try {
         const res = await fetch(JSON_URL);
         registros = await res.json();
@@ -214,20 +246,42 @@
         return alert("❌ Error al actualizar los datos antes de consultar.");
       }
 
-      const resultados = registros.filter(r => (r["Name"] || "").toLowerCase() === nombre);
+      const resultados = registros.filter(r => {
+        const nombreRegistro = (r["Name"] || "").toLowerCase().trim();
+        const fechaRegistro = parsearFechaManual(r["Date"]);
+        return nombreRegistro === nombre && fechaRegistro === fechaSeleccionada;
+      });
+
+
       if (resultados.length) {
         resultados.forEach(r => {
           const li = document.createElement("li");
           li.className = "list-group-item";
           li.textContent = `${r["Date"] || "(sin fecha)"} - ${r["Address"]}`;
-          lista.appendChild(li);
+
+          const row = document.createElement("tr");
+          row.innerHTML = `<td>${r["Name"]}</td><td>${r["Address"]}</td><td>${r["Date"]}</td>`;
+          tabla.appendChild(row);
         });
+        contador.textContent = resultados.length;
         contenedor.style.display = "block";
       } else {
-        alert("No hay registros para ese nombre");
+        contenedor.style.display = "none";
+        alert("No hay registros para hoy");
       }
     });
 
+
+    function mostrarDetalle() {
+      document.getElementById("detalleResultados").style.display = "block";
+    }
+    function normalizarFecha(fecha) {
+      return (fecha || "")
+        .toLowerCase()
+        .replace(/[.]/g, "") // elimina puntos
+        .replace(/\s+/g, " ") // espacios dobles
+        .trim();
+    }
 
     document.addEventListener("DOMContentLoaded", async () => {
       const nombreGuardado = localStorage.getItem("miNombreGuardado");
