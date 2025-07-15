@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>📋 Actualizar </title>
+  <title>📋 DC Ortiz</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
@@ -15,10 +15,10 @@
   </style>
 </head>
 <body>
-  <h4 class="text-center mb-3">📋 Actualizar </h4>
+  <h4 class="text-center mb-3">📋 DC Ortiz</h4>
 
-  <div id="alertaModificacion" class="alert alert-warning" role="alert">
-    ⚠️ Al modificar los datos se actualizará la información existente.
+  <div id="alertaModificacion" class="alert alert-danger" role="alert">
+    ⚠️ Este trabajo ya fue realizado por <span id="nombreAlerta"></span>.
   </div>
 
   <div class="mb-2 position-relative">
@@ -41,7 +41,7 @@
     <label for="fecha">Fecha:</label>
     <input type="date" class="form-control" id="fecha" name="Date" required>
 
-    <button type="submit" class="btn btn-success w-100 mt-3">✅ Actualizar </button>
+    <button type="submit" class="btn btn-success w-100 mt-3">✅ Actualizar</button>
   </form>
 
   <script>
@@ -54,6 +54,8 @@
     const nombreInput = document.getElementById("nombre");
     const fechaInput = document.getElementById("fecha");
     const alerta = document.getElementById("alertaModificacion");
+    const nombreAlerta = document.getElementById("nombreAlerta");
+    const botonActualizar = document.querySelector("form button[type='submit']");
     let direcciones = [];
     let registros = [];
 
@@ -71,6 +73,13 @@
     buscar.addEventListener("input", () => {
       const q = buscar.value.toLowerCase();
       sugerencias.innerHTML = "";
+      alerta.style.display = "none";
+      nombreInput.value = "";
+      fechaInput.value = new Date().toISOString().split("T")[0];
+      nombreInput.disabled = false;
+      fechaInput.disabled = false;
+      botonActualizar.disabled = false;
+
       if (q.trim() === "") return sugerencias.style.display = "none";
 
       const filtradas = direcciones.filter(d => d.toLowerCase().includes(q));
@@ -88,15 +97,36 @@
       hiddenDireccion.value = dir;
       sugerencias.style.display = "none";
       const registro = registros.find(r => r["Address"] === dir);
+
       if (registro) {
         nombreInput.value = registro["Name"] || "";
-        if (registro["Date"]) {
-          const f = new Date(registro["Date"]);
-          fechaInput.value = !isNaN(f) ? f.toISOString().split("T")[0] : "";
+        const fechaCruda = registro["Date"];
+        if (fechaCruda && !isNaN(new Date(fechaCruda))) {
+          fechaInput.value = new Date(fechaCruda).toISOString().split("T")[0];
         } else {
-          fechaInput.value = "";
+          fechaInput.value = new Date().toISOString().split("T")[0];
         }
-        alerta.style.display = "block";
+
+        if (registro["Name"]) {
+          alerta.style.display = "block";
+          nombreAlerta.textContent = registro["Name"];
+          nombreInput.disabled = true;
+          fechaInput.disabled = true;
+          botonActualizar.disabled = true;
+        } else {
+          alerta.style.display = "none";
+          nombreInput.disabled = false;
+          fechaInput.disabled = false;
+          botonActualizar.disabled = false;
+        }
+
+      } else {
+        nombreInput.value = "";
+        fechaInput.value = new Date().toISOString().split("T")[0];
+        alerta.style.display = "none";
+        nombreInput.disabled = false;
+        fechaInput.disabled = false;
+        botonActualizar.disabled = false;
       }
     }
 
@@ -118,9 +148,16 @@
     });
 
     document.addEventListener("DOMContentLoaded", () => {
-      const hoy = new Date().toISOString().split("T")[0];
-      fechaInput.value = hoy;
+      fechaInput.value = new Date().toISOString().split("T")[0];
       cargarHoja();
+    });
+
+    nombreInput.addEventListener("input", () => {
+      let valor = nombreInput.value.trimStart();
+      if (valor.length > 0) {
+        valor = valor.charAt(0).toUpperCase() + valor.slice(1);
+      }
+      nombreInput.value = valor.replace(/\s+$/, "");
     });
   </script>
 </body>
