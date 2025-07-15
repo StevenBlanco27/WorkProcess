@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>📋 Actualizar Google Sheet</title>
+  <title>📋 Actualizar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
@@ -11,10 +11,15 @@
     .suggestions div { padding: 8px; cursor: pointer; }
     .suggestions div:hover { background: #f0f0f0; }
     .position-relative { position: relative; }
+    #alertaModificacion { display: none; }
   </style>
 </head>
 <body>
-  <h4 class="text-center mb-3">📋 Actualizar Google Sheet</h4>
+  <h4 class="text-center mb-3">📋 Actualizar</h4>
+
+  <div id="alertaModificacion" class="alert alert-warning" role="alert">
+    ⚠️ Al modificar los datos se actualizará la información existente.
+  </div>
 
   <div class="mb-2 position-relative">
     <label for="buscar">Dirección:</label>
@@ -24,7 +29,7 @@
 
   <div class="d-flex gap-2 mb-3">
     <button id="copiar" class="btn btn-secondary flex-fill">📋 Copiar dirección</button>
-    <button id="recargar" class="btn btn-outline-primary flex-fill">🔄 Recargar hoja</button>
+    <!-- <button id="recargar" class="btn btn-outline-primary flex-fill">🔄 Recargar hoja</button> -->
   </div>
 
   <form id="formulario" action="https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec" method="POST" target="_blank">
@@ -36,7 +41,7 @@
     <label for="fecha">Fecha:</label>
     <input type="date" class="form-control" id="fecha" name="Date" required>
 
-    <button type="submit" class="btn btn-success w-100 mt-3">✅ Actualizar en Google Sheets</button>
+    <button type="submit" class="btn btn-success w-100 mt-3">✅ Actualizar</button>
   </form>
 
   <script>
@@ -46,12 +51,17 @@
     const buscar = document.getElementById("buscar");
     const sugerencias = document.getElementById("sugerencias");
     const hiddenDireccion = document.getElementById("direccionSeleccionada");
+    const nombreInput = document.getElementById("nombre");
+    const fechaInput = document.getElementById("fecha");
+    const alerta = document.getElementById("alertaModificacion");
     let direcciones = [];
+    let registros = [];
 
     async function cargarHoja() {
       try {
         const res = await fetch(JSON_URL);
         const data = await res.json();
+        registros = data;
         direcciones = [...new Set(data.map(r => r["Address"]).filter(Boolean))].sort();
       } catch {
         alert("❌ No se pudo cargar la hoja.");
@@ -67,15 +77,28 @@
       filtradas.forEach(d => {
         const div = document.createElement("div");
         div.textContent = d;
-        div.onclick = () => {
-          buscar.value = d;
-          hiddenDireccion.value = d;
-          sugerencias.style.display = "none";
-        };
+        div.onclick = () => seleccionarDireccion(d);
         sugerencias.appendChild(div);
       });
       sugerencias.style.display = filtradas.length ? "block" : "none";
     });
+
+    function seleccionarDireccion(dir) {
+      buscar.value = dir;
+      hiddenDireccion.value = dir;
+      sugerencias.style.display = "none";
+      const registro = registros.find(r => r["Address"] === dir);
+      if (registro) {
+        nombreInput.value = registro["Name"] || "";
+        if (registro["Date"]) {
+          const f = new Date(registro["Date"]);
+          fechaInput.value = !isNaN(f) ? f.toISOString().split("T")[0] : "";
+        } else {
+          fechaInput.value = "";
+        }
+        alerta.style.display = "block";
+      }
+    }
 
     document.addEventListener("click", e => {
       if (!sugerencias.contains(e.target) && e.target !== buscar) {
@@ -96,7 +119,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       const hoy = new Date().toISOString().split("T")[0];
-      document.getElementById("fecha").value = hoy;
+      fechaInput.value = hoy;
       cargarHoja();
     });
   </script>
