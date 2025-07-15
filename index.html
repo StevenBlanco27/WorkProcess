@@ -28,11 +28,12 @@
   </div>
 
   <div class="d-flex gap-2 mb-3">
-    <button id="copiar" class="btn btn-secondary flex-fill">📋 Copiar dirección</button>
-    <button id="recargar" class="btn btn-outline-primary flex-fill" hidden>🔄 Recargar hoja</button>
+    <button id="copiar" class="btn btn-secondary flex-fill">📋 Copiar</button>
+    <button id="limpiar" class="btn btn-outline-secondary flex-fill">🧹 Limpiar</button>
+    <button id="recargar" class="btn btn-outline-primary flex-fill" hidden>🔄 Recargar</button>
   </div>
 
-  <form id="formulario" action="https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec" method="POST" target="_blank">
+  <form id="formulario" autocomplete="off">
     <input type="hidden" name="Address" id="direccionSeleccionada" />
 
     <label for="nombre">Nombre:</label>
@@ -41,13 +42,15 @@
     <label for="fecha">Fecha:</label>
     <input type="date" class="form-control" id="fecha" name="Date" required>
 
-    <button type="submit" class="btn btn-success w-100 mt-3">✅ Actualizar</button>
+    <button type="submit" class="btn btn-success w-100 mt-3" id="btnActualizar">✅ Actualizar</button>
   </form>
 
   <script>
     const SHEET_ID = "1c-3Mo4hN83ID8HIpIsmiGc3hppHuEPMSnGkpRHZJk0o";
     const SHEET_NAME = "Sheet1";
     const JSON_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
+    const POST_URL = "https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec";
+
     const buscar = document.getElementById("buscar");
     const sugerencias = document.getElementById("sugerencias");
     const hiddenDireccion = document.getElementById("direccionSeleccionada");
@@ -55,32 +58,35 @@
     const fechaInput = document.getElementById("fecha");
     const alerta = document.getElementById("alertaModificacion");
     const nombreAlerta = document.getElementById("nombreAlerta");
-    const botonActualizar = document.querySelector("form button[type='submit']");
+    const btnActualizar = document.getElementById("btnActualizar");
+
     let direcciones = [];
     let registros = [];
 
     async function cargarHoja() {
       try {
         const res = await fetch(JSON_URL);
-        const data = await res.json();
-        registros = data;
-        direcciones = [...new Set(data.map(r => r["Address"]).filter(Boolean))].sort();
+        registros = await res.json();
+        direcciones = [...new Set(registros.map(r => r["Address"]).filter(Boolean))].sort();
       } catch {
         alert("❌ No se pudo cargar la hoja.");
       }
     }
 
-    buscar.addEventListener("input", () => {
-      const q = buscar.value.toLowerCase();
-      sugerencias.innerHTML = "";
+    function resetForm() {
       alerta.style.display = "none";
       nombreInput.value = "";
       fechaInput.value = new Date().toISOString().split("T")[0];
       nombreInput.disabled = false;
       fechaInput.disabled = false;
-      botonActualizar.disabled = false;
+      btnActualizar.disabled = false;
+    }
 
-      if (q.trim() === "") return sugerencias.style.display = "none";
+    buscar.addEventListener("input", () => {
+      const q = buscar.value.toLowerCase();
+      sugerencias.innerHTML = "";
+      resetForm();
+      if (!q) return sugerencias.style.display = "none";
 
       const filtradas = direcciones.filter(d => d.toLowerCase().includes(q));
       filtradas.forEach(d => {
@@ -96,61 +102,41 @@
       buscar.value = dir;
       hiddenDireccion.value = dir;
       sugerencias.style.display = "none";
-      const registro = registros.find(r => r["Address"] === dir);
+      const reg = registros.find(r => r["Address"] === dir);
+      const hoy = new Date().toISOString().split("T")[0];
 
-      if (registro) {
-        nombreInput.value = registro["Name"] || "";
-        const fechaCruda = registro["Date"];
-        if (fechaCruda && !isNaN(new Date(fechaCruda))) {
-          fechaInput.value = new Date(fechaCruda).toISOString().split("T")[0];
-        } else {
-          fechaInput.value = new Date().toISOString().split("T")[0];
-        }
+      if (reg) {
+        nombreInput.value = reg["Name"] || "";
+        fechaInput.value = reg["Date"] && !isNaN(new Date(reg["Date"])) ? new Date(reg["Date"]).toISOString().split("T")[0] : hoy;
 
-        if (registro["Name"]) {
+        if (reg["Name"] && reg["Date"]) {
           alerta.style.display = "block";
-          nombreAlerta.textContent = registro["Name"];
+          nombreAlerta.textContent = reg["Name"];
           nombreInput.disabled = true;
           fechaInput.disabled = true;
-          botonActualizar.disabled = true;
+          btnActualizar.disabled = true;
         } else {
           alerta.style.display = "none";
           nombreInput.disabled = false;
           fechaInput.disabled = false;
-          botonActualizar.disabled = false;
+          btnActualizar.disabled = false;
         }
-
-      } else {
-        nombreInput.value = "";
-        fechaInput.value = new Date().toISOString().split("T")[0];
-        alerta.style.display = "none";
-        nombreInput.disabled = false;
-        fechaInput.disabled = false;
-        botonActualizar.disabled = false;
       }
     }
 
-    document.addEventListener("click", e => {
-      if (!sugerencias.contains(e.target) && e.target !== buscar) {
-        sugerencias.style.display = "none";
-      }
-    });
-
-    document.getElementById("copiar").addEventListener("click", () => {
-      if (!buscar.value) return alert("Escribe o selecciona una dirección");
+    document.getElementById("copiar").onclick = () => {
+      if (!buscar.value) return alert("Escribe una dirección");
       navigator.clipboard.writeText(buscar.value).then(() => alert("Dirección copiada ✅"));
-    });
+    };
 
-    document.getElementById("recargar").addEventListener("click", cargarHoja);
+    document.getElementById("limpiar").onclick = () => {
+      buscar.value = "";
+      hiddenDireccion.value = "";
+      resetForm();
+      buscar.focus();
+    };
 
-    document.getElementById("formulario").addEventListener("submit", () => {
-      hiddenDireccion.value = buscar.value.trim();
-    });
-
-    document.addEventListener("DOMContentLoaded", () => {
-      fechaInput.value = new Date().toISOString().split("T")[0];
-      cargarHoja();
-    });
+    document.getElementById("recargar").onclick = cargarHoja;
 
     nombreInput.addEventListener("input", () => {
       let valor = nombreInput.value.trimStart();
@@ -158,6 +144,47 @@
         valor = valor.charAt(0).toUpperCase() + valor.slice(1);
       }
       nombreInput.value = valor.replace(/\s+$/, "");
+    });
+
+    document.getElementById("formulario").addEventListener("submit", async e => {
+      e.preventDefault();
+      const dir = buscar.value.trim();
+      const nombre = nombreInput.value.trim();
+      const fecha = fechaInput.value;
+
+      if (!dir || !nombre || !fecha) return alert("⚠️ Debes completar todos los campos.");
+
+      // 🔄 VOLVER A CARGAR la hoja justo antes de validar
+      try {
+        const res = await fetch(JSON_URL);
+        registros = await res.json();
+      } catch {
+        return alert("❌ Error al verificar los datos más recientes");
+      }
+
+      const yaExiste = registros.find(r => r["Address"] === dir && r["Name"] && r["Date"]);
+      if (yaExiste) return alert("❌ Esta dirección ya fue registrada por " + yaExiste["Name"]);
+
+      const datos = new FormData();
+      datos.append("Address", dir);
+      datos.append("Name", nombre);
+      datos.append("Date", fecha);
+
+      try {
+        const res = await fetch(POST_URL, { method: "POST", body: datos });
+        if (!res.ok) return alert("❌ Error al guardar");
+        alert("✅ Información guardada correctamente");
+        await cargarHoja(); // refrescar en memoria local
+        document.getElementById("limpiar").click();
+      } catch {
+        alert("❌ Error de red");
+      }
+    });
+
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      fechaInput.value = new Date().toISOString().split("T")[0];
+      await cargarHoja();
     });
   </script>
 </body>
