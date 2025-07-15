@@ -43,6 +43,7 @@
     const sel = document.getElementById("direccion");
     const buscar = document.getElementById("buscar");
     const hiddenDireccion = document.getElementById("direccionSeleccionada");
+    const fechaInput = document.getElementById("fecha");
 
     let addresses = [];
 
@@ -87,6 +88,12 @@
     });
 
     document.getElementById("recargar").addEventListener("click", cargarHoja);
+
+    // Rellenar fecha actual automáticamente al cargar
+    document.addEventListener("DOMContentLoaded", () => {
+      const hoy = new Date().toISOString().split("T")[0];
+      fechaInput.value = hoy;
+    });
 
     cargarHoja();
   </script>
