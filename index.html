@@ -3,19 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <title>📋 Actualizar Google Sheet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { max-width: 480px; margin: 20px auto; padding: 15px; }
-    label { margin-top: 10px; }
+    .suggestions { border: 1px solid #ccc; border-top: none; max-height: 200px; overflow-y: auto; display: none; position: absolute; width: 100%; background: white; z-index: 9999; }
+    .suggestions div { padding: 8px; cursor: pointer; }
+    .suggestions div:hover { background: #f0f0f0; }
+    .position-relative { position: relative; }
   </style>
 </head>
 <body>
   <h4 class="text-center mb-3">📋 Actualizar Google Sheet</h4>
 
-  <div class="mb-2">
+  <div class="mb-2 position-relative">
     <label for="buscar">Dirección:</label>
-    <input class="form-control" id="buscar" name="Address" list="direcciones" placeholder="Escribe o selecciona..." autocomplete="off" required>
-    <datalist id="direcciones"></datalist>
+    <input class="form-control" id="buscar" placeholder="Empieza a escribir..." autocomplete="off" required>
+    <div id="sugerencias" class="suggestions"></div>
   </div>
 
   <div class="d-flex gap-2 mb-3">
@@ -24,13 +28,13 @@
   </div>
 
   <form id="formulario" action="https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec" method="POST" target="_blank">
+    <input type="hidden" name="Address" id="direccionSeleccionada" />
+
     <label for="nombre">Nombre:</label>
-    <input type="text" class="form-control" id="nombre" name="Name" autocomplete="off" required>
+    <input type="text" class="form-control" id="nombre" name="Name" required>
 
     <label for="fecha">Fecha:</label>
-    <input type="date" class="form-control" id="fecha" name="Date" autocomplete="off" required>
-
-    <input type="hidden" name="Address" id="direccionSeleccionada" />
+    <input type="date" class="form-control" id="fecha" name="Date" required>
 
     <button type="submit" class="btn btn-success w-100 mt-3">✅ Actualizar en Google Sheets</button>
   </form>
@@ -39,40 +43,57 @@
     const SHEET_ID = "1c-3Mo4hN83ID8HIpIsmiGc3hppHuEPMSnGkpRHZJk0o";
     const SHEET_NAME = "Sheet1";
     const JSON_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
-    const datalist = document.getElementById("direcciones");
     const buscar = document.getElementById("buscar");
-    const hiddenInput = document.getElementById("direccionSeleccionada");
+    const sugerencias = document.getElementById("sugerencias");
+    const hiddenDireccion = document.getElementById("direccionSeleccionada");
+    let direcciones = [];
 
     async function cargarHoja() {
       try {
         const res = await fetch(JSON_URL);
         const data = await res.json();
-        const addresses = [...new Set(data.map(r => r["Address"]).filter(Boolean))].sort();
-        datalist.innerHTML = "";
-        addresses.forEach(dir => {
-          const opt = document.createElement("option");
-          opt.value = dir;
-          datalist.appendChild(opt);
-        });
+        direcciones = [...new Set(data.map(r => r["Address"]).filter(Boolean))].sort();
       } catch {
         alert("❌ No se pudo cargar la hoja.");
       }
     }
 
+    buscar.addEventListener("input", () => {
+      const q = buscar.value.toLowerCase();
+      sugerencias.innerHTML = "";
+      if (q.trim() === "") return sugerencias.style.display = "none";
+
+      const filtradas = direcciones.filter(d => d.toLowerCase().includes(q));
+      filtradas.forEach(d => {
+        const div = document.createElement("div");
+        div.textContent = d;
+        div.onclick = () => {
+          buscar.value = d;
+          hiddenDireccion.value = d;
+          sugerencias.style.display = "none";
+        };
+        sugerencias.appendChild(div);
+      });
+      sugerencias.style.display = filtradas.length ? "block" : "none";
+    });
+
+    document.addEventListener("click", e => {
+      if (!sugerencias.contains(e.target) && e.target !== buscar) {
+        sugerencias.style.display = "none";
+      }
+    });
+
     document.getElementById("copiar").addEventListener("click", () => {
       if (!buscar.value) return alert("Escribe o selecciona una dirección");
-      navigator.clipboard.writeText(buscar.value).then(() =>
-        alert("Dirección copiada ✅")
-      );
+      navigator.clipboard.writeText(buscar.value).then(() => alert("Dirección copiada ✅"));
     });
 
     document.getElementById("recargar").addEventListener("click", cargarHoja);
 
     document.getElementById("formulario").addEventListener("submit", () => {
-      hiddenInput.value = buscar.value.trim();
+      hiddenDireccion.value = buscar.value.trim();
     });
 
-    // Poner fecha de hoy por defecto
     document.addEventListener("DOMContentLoaded", () => {
       const hoy = new Date().toISOString().split("T")[0];
       document.getElementById("fecha").value = hoy;
