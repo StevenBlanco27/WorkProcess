@@ -16,11 +16,6 @@
     select {
       height: 200px;
     }
-    .output {
-      white-space: pre-wrap;
-      font-size: 0.85rem;
-      padding: 10px;
-    }
   </style>
 </head>
 <body>
@@ -41,15 +36,15 @@
       <button type="button" id="recargar" class="btn btn-outline-primary w-50">🔄 Recargar hoja</button>
     </div>
 
-    <form action="https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec" method="POST" target="_blank">
+    <form action="https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec" method="POST" target="_blank" autocomplete="off">
       <div class="mb-3">
         <label for="nombre" class="form-label">Nombre:</label>
-        <input type="text" name="Name" id="nombre" class="form-control" placeholder="Ej: Kevin" required />
+        <input type="text" name="Name" id="nombre" class="form-control" placeholder="Ej: Kevin" required autocomplete="off" />
       </div>
 
       <div class="mb-3">
         <label for="fecha" class="form-label">Fecha:</label>
-        <input type="date" name="Date" id="fecha" class="form-control" required />
+        <input type="date" name="Date" id="fecha" class="form-control" required autocomplete="off" />
       </div>
 
       <input type="hidden" name="Address" id="direccionSeleccionada" />
