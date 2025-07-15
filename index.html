@@ -10,54 +10,50 @@
     select { height: 160px; }
     .row { display: flex; gap: 8px; }
     .row > button { flex: 1; }
-    .output { background: #f1f1f1; border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; max-height: 160px; overflow: auto; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <h2>Actualizar Nombre y Fecha (Google Sheet)</h2>
+  <h2>Actualizar Nombre y Fecha (Google Sheets)</h2>
 
   <label for="buscar">Buscar dirección:</label>
   <input type="text" id="buscar" placeholder="Empieza a escribir..." autocomplete="off" />
-  <select id="direccion" size="8"></select>
+  <select id="direccion" size="8" name="Address"></select>
   <div class="row">
-    <button id="copiar">📋 Copiar dirección</button>
-    <button id="recargar">🔄 Recargar hoja</button>
+    <button type="button" id="copiar">📋 Copiar dirección</button>
+    <button type="button" id="recargar">🔄 Recargar hoja</button>
   </div>
 
-  <label for="nombre">Nombre:</label>
-  <input type="text" id="nombre" placeholder="Ej: Kevin" />
+  <form action="https://script.google.com/macros/s/AKfycbwWj8foCjOViSe8BPCmW7pWxw8QBK7D0PFvYUbwFQHf33o5FJ0dGSdgnD-zO6kmlT0u/exec" method="POST" target="_blank">
+    <label for="nombre">Nombre:</label>
+    <input type="text" name="Name" id="nombre" placeholder="Ej: Kevin" required />
 
-  <label for="fecha">Fecha:</label>
-  <input type="text" id="fecha" placeholder="Ej: 9 may" />
+    <label for="fecha">Fecha:</label>
+    <input type="text" name="Date" id="fecha" placeholder="Ej: 9 may" required />
 
-  <button id="actualizar">Actualizar en Google Sheets</button>
-  <div class="output" id="log"></div>
+    <input type="hidden" name="Address" id="direccionSeleccionada" />
+
+    <button type="submit">Actualizar en Google Sheets</button>
+  </form>
 
   <script>
     const SHEET_ID = "1c-3Mo4hN83ID8HIpIsmiGc3hppHuEPMSnGkpRHZJk0o";
     const SHEET_NAME = "Sheet1";
     const JSON_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
-    const POST_URL = "https://script.google.com/macros/s/AKfycbwWj8foCjOViSe8BPCmW7pWxw8QBK7D0PFvYUbwFQHf33o5FJ0dGSdgnD-zO6kmlT0u/exec";
-
-    let rows = [];
-    let addresses = [];
 
     const sel = document.getElementById("direccion");
     const buscar = document.getElementById("buscar");
-    const log = document.getElementById("log");
+    const hiddenDireccion = document.getElementById("direccionSeleccionada");
+
+    let addresses = [];
 
     async function cargarHoja() {
-      log.textContent = "Cargando desde Google Sheets...";
       try {
         const res = await fetch(JSON_URL);
         const data = await res.json();
-        rows = data;
-        addresses = [...new Set(rows.map(r => r["Address"]).filter(Boolean))].sort();
+        addresses = [...new Set(data.map(r => r["Address"]).filter(Boolean))].sort();
         pintarLista(addresses);
-        log.textContent = `Hoja cargada: ${rows.length} filas, ${addresses.length} direcciones.`;
       } catch (err) {
-        console.error(err);
-        log.textContent = "❌ Error al acceder a Google Sheets.";
+        alert("❌ Error al acceder a Google Sheets");
       }
     }
 
@@ -69,47 +65,29 @@
         opt.textContent = dir;
         sel.appendChild(opt);
       });
+      hiddenDireccion.value = sel.value;
     }
 
-    buscar.addEventListener("input", e => {
-      const q = e.target.value.toLowerCase();
+    buscar.addEventListener("input", () => {
+      const q = buscar.value.toLowerCase();
       const filtradas = addresses.filter(d => d.toLowerCase().includes(q));
       pintarLista(filtradas);
     });
 
     sel.addEventListener("change", () => {
       buscar.value = sel.value;
+      hiddenDireccion.value = sel.value;
     });
 
     document.getElementById("copiar").addEventListener("click", () => {
       if (!sel.value) return alert("Selecciona una dirección.");
       navigator.clipboard.writeText(sel.value).then(() => {
-        alert("Dirección copiada al portapapeles ✅");
-      }).catch(() => alert("No se pudo copiar"));
-    });
-
-    document.getElementById("actualizar").addEventListener("click", async () => {
-      const dir = sel.value.trim();
-      const name = document.getElementById("nombre").value.trim();
-      const date = document.getElementById("fecha").value.trim();
-      if (!dir || !name || !date) return alert("Completa todos los campos.");
-
-      try {
-        const res = await fetch(POST_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ Address: dir, Name: name, Date: date })
-        });
-        const txt = await res.text();
-        log.textContent = txt;
-        alert(txt);
-      } catch (err) {
-        console.error(err);
-        alert("❌ Error al enviar datos al servidor.");
-      }
+        alert("Dirección copiada ✅");
+      });
     });
 
     document.getElementById("recargar").addEventListener("click", cargarHoja);
+
     cargarHoja();
   </script>
 </body>
