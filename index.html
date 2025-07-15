@@ -2,119 +2,82 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Actualizar Google Sheet</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <title>📋 Actualizar Google Sheet</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body {
-      background-color: #f8f9fa;
-      padding-top: 30px;
-    }
-    .container {
-      max-width: 600px;
-    }
-    select {
-      height: 200px;
-    }
+    body { max-width: 480px; margin: 20px auto; padding: 15px; }
+    label { margin-top: 10px; }
   </style>
 </head>
 <body>
-  <div class="container shadow p-4 bg-white rounded">
-    <h3 class="mb-4 text-center">📋 Actualizar Google Sheet</h3>
+  <h4 class="text-center mb-3">📋 Actualizar Google Sheet</h4>
 
-    <div class="mb-3">
-      <label for="buscar" class="form-label">Buscar dirección:</label>
-      <input type="text" id="buscar" class="form-control" placeholder="Empieza a escribir..." autocomplete="off" />
-    </div>
-
-    <div class="mb-3">
-      <select id="direccion" size="8" class="form-select" name="Address"></select>
-    </div>
-
-    <div class="d-flex justify-content-between mb-3">
-      <button type="button" id="copiar" class="btn btn-secondary w-50 me-2">📋 Copiar dirección</button>
-      <button type="button" id="recargar" class="btn btn-outline-primary w-50">🔄 Recargar hoja</button>
-    </div>
-
-    <form action="https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec" method="POST" target="_blank" autocomplete="off">
-      <div class="mb-3">
-        <label for="nombre" class="form-label">Nombre:</label>
-        <input type="text" name="Name" id="nombre" class="form-control" placeholder="Ej: Kevin" required autocomplete="off" />
-      </div>
-
-      <div class="mb-3">
-        <label for="fecha" class="form-label">Fecha:</label>
-        <input type="date" name="Date" id="fecha" class="form-control" required autocomplete="off" />
-      </div>
-
-      <input type="hidden" name="Address" id="direccionSeleccionada" />
-
-      <div class="d-grid">
-        <button type="submit" class="btn btn-success">✅ Actualizar en Google Sheets</button>
-      </div>
-    </form>
+  <div class="mb-2">
+    <label for="buscar">Dirección:</label>
+    <input class="form-control" id="buscar" name="Address" list="direcciones" placeholder="Escribe o selecciona..." autocomplete="off" required>
+    <datalist id="direcciones"></datalist>
   </div>
+
+  <div class="d-flex gap-2 mb-3">
+    <button id="copiar" class="btn btn-secondary flex-fill">📋 Copiar dirección</button>
+    <button id="recargar" class="btn btn-outline-primary flex-fill">🔄 Recargar hoja</button>
+  </div>
+
+  <form id="formulario" action="https://script.google.com/macros/s/AKfycbxGFKzAF7q1dmnx0ppFmHqrBEQ_rIUm5zsIRs12FNQSKL02Q0KsYzoA-AnwdBy_mTqfKA/exec" method="POST" target="_blank">
+    <label for="nombre">Nombre:</label>
+    <input type="text" class="form-control" id="nombre" name="Name" autocomplete="off" required>
+
+    <label for="fecha">Fecha:</label>
+    <input type="date" class="form-control" id="fecha" name="Date" autocomplete="off" required>
+
+    <input type="hidden" name="Address" id="direccionSeleccionada" />
+
+    <button type="submit" class="btn btn-success w-100 mt-3">✅ Actualizar en Google Sheets</button>
+  </form>
 
   <script>
     const SHEET_ID = "1c-3Mo4hN83ID8HIpIsmiGc3hppHuEPMSnGkpRHZJk0o";
     const SHEET_NAME = "Sheet1";
     const JSON_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
-
-    const sel = document.getElementById("direccion");
+    const datalist = document.getElementById("direcciones");
     const buscar = document.getElementById("buscar");
-    const hiddenDireccion = document.getElementById("direccionSeleccionada");
-    const fechaInput = document.getElementById("fecha");
-
-    let addresses = [];
+    const hiddenInput = document.getElementById("direccionSeleccionada");
 
     async function cargarHoja() {
       try {
         const res = await fetch(JSON_URL);
         const data = await res.json();
-        addresses = [...new Set(data.map(r => r["Address"]).filter(Boolean))].sort();
-        pintarLista(addresses);
-      } catch (err) {
-        alert("❌ Error al acceder a Google Sheets");
+        const addresses = [...new Set(data.map(r => r["Address"]).filter(Boolean))].sort();
+        datalist.innerHTML = "";
+        addresses.forEach(dir => {
+          const opt = document.createElement("option");
+          opt.value = dir;
+          datalist.appendChild(opt);
+        });
+      } catch {
+        alert("❌ No se pudo cargar la hoja.");
       }
     }
 
-    function pintarLista(arr) {
-      sel.innerHTML = "";
-      arr.forEach(dir => {
-        const opt = document.createElement("option");
-        opt.value = dir;
-        opt.textContent = dir;
-        sel.appendChild(opt);
-      });
-      hiddenDireccion.value = sel.value;
-    }
-
-    buscar.addEventListener("input", () => {
-      const q = buscar.value.toLowerCase();
-      const filtradas = addresses.filter(d => d.toLowerCase().includes(q));
-      pintarLista(filtradas);
-    });
-
-    sel.addEventListener("change", () => {
-      buscar.value = sel.value;
-      hiddenDireccion.value = sel.value;
-    });
-
     document.getElementById("copiar").addEventListener("click", () => {
-      if (!sel.value) return alert("Selecciona una dirección.");
-      navigator.clipboard.writeText(sel.value).then(() => {
-        alert("Dirección copiada ✅");
-      });
+      if (!buscar.value) return alert("Escribe o selecciona una dirección");
+      navigator.clipboard.writeText(buscar.value).then(() =>
+        alert("Dirección copiada ✅")
+      );
     });
 
     document.getElementById("recargar").addEventListener("click", cargarHoja);
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const hoy = new Date().toISOString().split("T")[0];
-      fechaInput.value = hoy;
+    document.getElementById("formulario").addEventListener("submit", () => {
+      hiddenInput.value = buscar.value.trim();
     });
 
-    cargarHoja();
+    // Poner fecha de hoy por defecto
+    document.addEventListener("DOMContentLoaded", () => {
+      const hoy = new Date().toISOString().split("T")[0];
+      document.getElementById("fecha").value = hoy;
+      cargarHoja();
+    });
   </script>
 </body>
 </html>
