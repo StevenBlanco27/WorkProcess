@@ -12,6 +12,8 @@
     .suggestions div:hover { background: #f0f0f0; }
     .position-relative { position: relative; }
     #alertaModificacion { display: none; }
+    #spinner { display: none; }
+    #resultadoConsulta { display: none; max-height: 300px; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -31,11 +33,11 @@
     <button id="copiar" class="btn btn-secondary flex-fill">📋 Copiar</button>
     <button id="limpiar" class="btn btn-outline-secondary flex-fill">🧹 Limpiar</button>
     <button id="recargar" class="btn btn-outline-primary flex-fill" hidden>🔄 Recargar</button>
+    <button id="btnConsultar" class="btn btn-info flex-fill">🔍 Mis trabajos</button>
   </div>
 
   <form id="formulario" autocomplete="off">
     <input type="hidden" name="Address" id="direccionSeleccionada" />
-
     <label for="nombre">Nombre:</label>
     <input type="text" class="form-control" id="nombre" name="Name" required>
 
@@ -44,6 +46,17 @@
 
     <button type="submit" class="btn btn-success w-100 mt-3" id="btnActualizar">✅ Actualizar</button>
   </form>
+
+  <div id="spinner" class="text-center mt-3">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando...</span>
+    </div>
+    <div>Cargando...</div>
+  </div>
+
+  <div id="resultadoConsulta" class="border rounded p-2 bg-light mt-3">
+    <ul class="list-group" id="listaResultados"></ul>
+  </div>
 
   <script>
     const SHEET_ID = "1c-3Mo4hN83ID8HIpIsmiGc3hppHuEPMSnGkpRHZJk0o";
@@ -59,6 +72,9 @@
     const alerta = document.getElementById("alertaModificacion");
     const nombreAlerta = document.getElementById("nombreAlerta");
     const btnActualizar = document.getElementById("btnActualizar");
+    const spinner = document.getElementById("spinner");
+    const resultadoConsulta = document.getElementById("resultadoConsulta");
+    const listaResultados = document.getElementById("listaResultados");
 
     let direcciones = [];
     let registros = [];
@@ -75,7 +91,7 @@
 
     function resetForm() {
       alerta.style.display = "none";
-      nombreInput.value = "";
+      nombreInput.value = localStorage.getItem("miNombreGuardado") || "";
       fechaInput.value = new Date().toISOString().split("T")[0];
       nombreInput.disabled = false;
       fechaInput.disabled = false;
@@ -87,7 +103,6 @@
       sugerencias.innerHTML = "";
       resetForm();
       if (!q) return sugerencias.style.display = "none";
-
       const filtradas = direcciones.filter(d => d.toLowerCase().includes(q));
       filtradas.forEach(d => {
         const div = document.createElement("div");
@@ -104,11 +119,9 @@
       sugerencias.style.display = "none";
       const reg = registros.find(r => r["Address"] === dir);
       const hoy = new Date().toISOString().split("T")[0];
-
       if (reg) {
-        nombreInput.value = reg["Name"] || "";
+        nombreInput.value = reg["Name"] || localStorage.getItem("miNombreGuardado") || "";
         fechaInput.value = reg["Date"] && !isNaN(new Date(reg["Date"])) ? new Date(reg["Date"]).toISOString().split("T")[0] : hoy;
-
         if (reg["Name"] && reg["Date"]) {
           alerta.style.display = "block";
           nombreAlerta.textContent = reg["Name"];
@@ -146,43 +159,79 @@
       nombreInput.value = valor.replace(/\s+$/, "");
     });
 
+    nombreInput.addEventListener("blur", () => {
+      const nombre = nombreInput.value.trim();
+      if (nombre) localStorage.setItem("miNombreGuardado", nombre);
+    });
+
     document.getElementById("formulario").addEventListener("submit", async e => {
       e.preventDefault();
       const dir = buscar.value.trim();
       const nombre = nombreInput.value.trim();
       const fecha = fechaInput.value;
-
       if (!dir || !nombre || !fecha) return alert("⚠️ Debes completar todos los campos.");
+      try {
+        spinner.style.display = "block";
+        const resVerif = await fetch(JSON_URL);
+        registros = await resVerif.json();
+        const yaExiste = registros.find(r => r["Address"] === dir && r["Name"] && r["Date"]);
+        if (yaExiste) {
+          spinner.style.display = "none";
+          return alert("❌ Esta dirección ya fue registrada por " + yaExiste["Name"]);
+        }
+        const datos = new FormData();
+        datos.append("Address", dir);
+        datos.append("Name", nombre);
+        datos.append("Date", fecha);
+        const res = await fetch(POST_URL, { method: "POST", body: datos });
+        if (!res.ok) throw new Error("Error al guardar");
+        alert("✅ Información guardada correctamente");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await cargarHoja();
+        document.getElementById("limpiar").click();
+      } catch (err) {
+        alert("❌ " + (err.message || "Error de red"));
+      } finally {
+        spinner.style.display = "none";
+      }
+    });
 
-      // 🔄 VOLVER A CARGAR la hoja justo antes de validar
+    document.getElementById("btnConsultar").addEventListener("click", async () => {
+      const nombre = document.getElementById("nombre").value.trim().toLowerCase(); // usa el nombre ya ingresado
+      const lista = document.getElementById("listaResultados");
+      const contenedor = document.getElementById("resultadoConsulta");
+
+      if (!nombre) return alert("Escribe tu nombre arriba para buscar");
+
+      lista.innerHTML = "";
+      contenedor.style.display = "none";
+
+      // 🔄 Refrescar datos antes de buscar
       try {
         const res = await fetch(JSON_URL);
         registros = await res.json();
       } catch {
-        return alert("❌ Error al verificar los datos más recientes");
+        return alert("❌ Error al actualizar los datos antes de consultar.");
       }
 
-      const yaExiste = registros.find(r => r["Address"] === dir && r["Name"] && r["Date"]);
-      if (yaExiste) return alert("❌ Esta dirección ya fue registrada por " + yaExiste["Name"]);
-
-      const datos = new FormData();
-      datos.append("Address", dir);
-      datos.append("Name", nombre);
-      datos.append("Date", fecha);
-
-      try {
-        const res = await fetch(POST_URL, { method: "POST", body: datos });
-        if (!res.ok) return alert("❌ Error al guardar");
-        alert("✅ Información guardada correctamente");
-        await cargarHoja(); // refrescar en memoria local
-        document.getElementById("limpiar").click();
-      } catch {
-        alert("❌ Error de red");
+      const resultados = registros.filter(r => (r["Name"] || "").toLowerCase() === nombre);
+      if (resultados.length) {
+        resultados.forEach(r => {
+          const li = document.createElement("li");
+          li.className = "list-group-item";
+          li.textContent = `${r["Date"] || "(sin fecha)"} - ${r["Address"]}`;
+          lista.appendChild(li);
+        });
+        contenedor.style.display = "block";
+      } else {
+        alert("No hay registros para ese nombre");
       }
     });
 
 
     document.addEventListener("DOMContentLoaded", async () => {
+      const nombreGuardado = localStorage.getItem("miNombreGuardado");
+      if (nombreGuardado) nombreInput.value = nombreGuardado;
       fechaInput.value = new Date().toISOString().split("T")[0];
       await cargarHoja();
     });
