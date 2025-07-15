@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Actualizar Google Sheet</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 24px auto; padding: 10px; background: #fafafa; }
+    input, select, button { padding: 10px; width: 100%; margin: 6px 0; box-sizing: border-box; border: 1px solid #bbb; border-radius: 4px; }
+    label { font-weight: 600; display: block; margin-top: 10px; }
+    select { height: 160px; }
+    .row { display: flex; gap: 8px; }
+    .row > button { flex: 1; }
+    .output { background: #f1f1f1; border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; max-height: 160px; overflow: auto; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h2>Actualizar Nombre y Fecha (Google Sheet)</h2>
+
+  <label for="buscar">Buscar dirección:</label>
+  <input type="text" id="buscar" placeholder="Empieza a escribir..." autocomplete="off" />
+  <select id="direccion" size="8"></select>
+  <div class="row">
+    <button id="copiar">📋 Copiar dirección</button>
+    <button id="recargar">🔄 Recargar hoja</button>
+  </div>
+
+  <label for="nombre">Nombre:</label>
+  <input type="text" id="nombre" placeholder="Ej: Kevin" />
+
+  <label for="fecha">Fecha:</label>
+  <input type="text" id="fecha" placeholder="Ej: 9 may" />
+
+  <button id="actualizar">Actualizar en Google Sheets</button>
+  <div class="output" id="log"></div>
+
+  <script>
+    const SHEET_ID = "1c-3Mo4hN83ID8HIpIsmiGc3hppHuEPMSnGkpRHZJk0o";
+    const SHEET_NAME = "Sheet1";
+    const JSON_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
+    const POST_URL = "https://script.google.com/macros/s/AKfycbxdnqXc6OA7hXBdfSVjO_vZdc6AE66UtK8-tRBcSO_PCg9tGb3zWfUdK5Pe44Z61TUV/exec";
+
+    let rows = [];
+    let addresses = [];
+
+    const sel = document.getElementById("direccion");
+    const buscar = document.getElementById("buscar");
+    const log = document.getElementById("log");
+
+    async function cargarHoja() {
+      log.textContent = "Cargando desde Google Sheets...";
+      try {
+        const res = await fetch(JSON_URL);
+        const data = await res.json();
+        rows = data;
+        addresses = [...new Set(rows.map(r => r["Address"]).filter(Boolean))].sort();
+        pintarLista(addresses);
+        log.textContent = `Hoja cargada: ${rows.length} filas, ${addresses.length} direcciones.`;
+      } catch (err) {
+        console.error(err);
+        log.textContent = "❌ Error al acceder a Google Sheets.";
+      }
+    }
+
+    function pintarLista(arr) {
+      sel.innerHTML = "";
+      arr.forEach(dir => {
+        const opt = document.createElement("option");
+        opt.value = dir;
+        opt.textContent = dir;
+        sel.appendChild(opt);
+      });
+    }
+
+    buscar.addEventListener("input", e => {
+      const q = e.target.value.toLowerCase();
+      const filtradas = addresses.filter(d => d.toLowerCase().includes(q));
+      pintarLista(filtradas);
+    });
+
+    sel.addEventListener("change", () => {
+      buscar.value = sel.value;
+    });
+
+    document.getElementById("copiar").addEventListener("click", () => {
+      if (!sel.value) return alert("Selecciona una dirección.");
+      navigator.clipboard.writeText(sel.value).then(() => {
+        alert("Dirección copiada al portapapeles ✅");
+      }).catch(() => alert("No se pudo copiar"));
+    });
+
+    document.getElementById("actualizar").addEventListener("click", async () => {
+      const dir = sel.value.trim();
+      const name = document.getElementById("nombre").value.trim();
+      const date = document.getElementById("fecha").value.trim();
+      if (!dir || !name || !date) return alert("Completa todos los campos.");
+
+      try {
+        const res = await fetch(POST_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ Address: dir, Name: name, Date: date })
+        });
+        const txt = await res.text();
+        log.textContent = txt;
+        alert(txt);
+      } catch (err) {
+        console.error(err);
+        alert("❌ Error al enviar datos al servidor.");
+      }
+    });
+
+    document.getElementById("recargar").addEventListener("click", cargarHoja);
+    cargarHoja();
+  </script>
+</body>
+</html>
